@@ -376,22 +376,7 @@ MIT License — see [LICENSE](LICENSE)
 
 ## Maintainers
 
-**Сергей Богорад** ([@xodapi](https://github.com/xodapi))
-
-AI-инженер, 20+ лет в системной разработке (ОАО РЖД). Работаю с 5–7 параллельными агентными сессиями в день, управляю production-кодом через контракты, ветвления и fail-closed гейты.
-
-### Portfolio & Resume
-
-- 🌐 **Main Portfolio**: https://bogorad.syntog.ru/
-- 📄 **Public Resume**: https://bogorad.syntog.ru/r (AI-engineer profile)
-- 📋 **Address Response**: https://bogorad.syntog.ru/webmasters/ (for WebMasters)
-
-### Connect
-
-- **GitHub**: [github.com/xodapi](https://github.com/xodapi) (2,200+ контрибуций/год, 38 репозиториев)
-- **Telegram**: [@serg_borisovich](https://t.me/serg_borisovich)
-- **Phone**: +7 983 205-56-78
-- **Location**: Санкт-Петербург · готов к офису 5/2
+- [@xodapi](https://github.com/xodapi)
 
 ## Acknowledgments
 
