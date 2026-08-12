@@ -379,6 +379,33 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDU
 
 MIT License — see [LICENSE](LICENSE)
 
+## Factory Droid Integration
+
+Add to `~/.factory/settings.json` under `customModels`:
+
+```json
+{
+  "customModels": [
+    {
+      "model": "deepseek-v4-flash-free",
+      "id": "custom:opencode-deepseek-v4-flash-free",
+      "displayName": "DeepSeek V4 Flash [OpenCode Proxy]",
+      "baseUrl": "http://127.0.0.1:3001/v1",
+      "apiKey": "public",
+      "provider": "generic-chat-completion-api",
+      "maxOutputTokens": 8192,
+      "maxContextLimit": 128000
+    }
+  ]
+}
+```
+
+**Setup**:
+1. Start proxy: `.\target\release\opencode-proxy.exe`
+2. Add config to `~/.factory/settings.json`
+3. Run Droid CLI: `droid /model`
+4. Select "DeepSeek V4 Flash [OpenCode Proxy]"
+
 ## Maintainers
 
 - [@xodapi](https://github.com/xodapi)
