@@ -1,0 +1,125 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Get changelog entry
+        id: changelog
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          # Extract changelog for this version
+          sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | head -n -1 > CHANGELOG_ENTRY.txt
+          cat CHANGELOG_ENTRY.txt
+
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ steps.version.outputs.VERSION }}
+          body_path: CHANGELOG_ENTRY.txt
+          draft: false
+          prerelease: false
+
+  build-and-release:
+    name: Build and Release
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: opencode-proxy
+            
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: opencode-proxy.exe
+            
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact: opencode-proxy
+            
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: opencode-proxy
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse version from tag
+        id: version
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "VERSION=$VERSION" >> $GITHUB_ENV
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Create archive (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir opencode-proxy-${{ env.VERSION }}-${{ matrix.target }}
+          cp target/${{ matrix.target }}/release/${{ matrix.artifact }} opencode-proxy-${{ env.VERSION }}-${{ matrix.target }}/
+          cp README.md LICENSE opencode-proxy-${{ env.VERSION }}-${{ matrix.target }}/
+          tar czf opencode-proxy-${{ env.VERSION }}-${{ matrix.target }}.tar.gz opencode-proxy-${{ env.VERSION }}-${{ matrix.target }}
+
+      - name: Create archive (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir opencode-proxy-${{ env.VERSION }}-${{ matrix.target }}
+          copy target/${{ matrix.target }}/release/${{ matrix.artifact }} opencode-proxy-${{ env.VERSION }}-${{ matrix.target }}/
+          copy README.md LICENSE opencode-proxy-${{ env.VERSION }}-${{ matrix.target }}/
+          Compress-Archive -Path opencode-proxy-${{ env.VERSION }}-${{ matrix.target }} -DestinationPath opencode-proxy-${{ env.VERSION }}-${{ matrix.target }}.zip
+
+      - name: Upload asset (Unix)
+        if: runner.os != 'Windows'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./opencode-proxy-${{ env.VERSION }}-${{ matrix.target }}.tar.gz
+          asset_name: opencode-proxy-${{ env.VERSION }}-${{ matrix.target }}.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload asset (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./opencode-proxy-${{ env.VERSION }}-${{ matrix.target }}.zip
+          asset_name: opencode-proxy-${{ env.VERSION }}-${{ matrix.target }}.zip
+          asset_content_type: application/zip

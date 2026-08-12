@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub Discussions
+    url: https://github.com/ArtemPotapov52/opencode-proxy/discussions
+    about: Ask questions and share ideas in our discussions forum

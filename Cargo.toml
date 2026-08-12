@@ -1,0 +1,44 @@
+[package]
+name = "opencode-proxy"
+version = "1.7.0"
+edition = "2021"
+license = "MIT"
+description = "High-performance OpenAI-compatible proxy for OpenCode Zen API with dashboard, streaming, and load balancing"
+repository = "https://github.com/ArtemPotapov52/opencode-proxy"
+homepage = "https://github.com/ArtemPotapov52/opencode-proxy"
+documentation = "https://github.com/ArtemPotapov52/opencode-proxy#readme"
+authors = ["xodapi"]
+default-run = "opencode-proxy"
+keywords = ["openai", "proxy", "api", "llm", "rust"]
+categories = ["network-programming", "web-programming", "command-line-utilities"]
+readme = "README.md"
+
+[profile.release]
+opt-level = "z"
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tower-http = { version = "0.6", features = ["cors"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+rand = "0.8"
+url = "2"
+tokio-stream = "0.1"
+futures = "0.3"
+dotenvy = "0.15"
+
+[build-dependencies]
+winres = "0.1"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
