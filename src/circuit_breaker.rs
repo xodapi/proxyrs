@@ -1,7 +1,7 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
 use serde::Serialize;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -61,7 +61,13 @@ pub enum RoutingStrategy {
 }
 
 impl Provider {
-    pub fn new(url: String, api_key: String, name: String, max_failures: u32, reset_timeout: Duration) -> Self {
+    pub fn new(
+        url: String,
+        api_key: String,
+        name: String,
+        max_failures: u32,
+        reset_timeout: Duration,
+    ) -> Self {
         Self {
             url,
             api_key,
@@ -109,13 +115,17 @@ impl Provider {
             429 => {
                 self.state = ProviderState::Degraded;
                 if self.consecutive_failures >= self.max_failures {
-                    self.circuit = CircuitState::Open { opened_at: Instant::now() };
+                    self.circuit = CircuitState::Open {
+                        opened_at: Instant::now(),
+                    };
                     self.state = ProviderState::Down;
                 }
             }
             500..=599 => {
                 if self.consecutive_failures >= self.max_failures {
-                    self.circuit = CircuitState::Open { opened_at: Instant::now() };
+                    self.circuit = CircuitState::Open {
+                        opened_at: Instant::now(),
+                    };
                     self.state = ProviderState::Down;
                 } else {
                     self.state = ProviderState::Degraded;
@@ -123,7 +133,9 @@ impl Provider {
             }
             _ => {
                 if self.consecutive_failures >= self.max_failures {
-                    self.circuit = CircuitState::Open { opened_at: Instant::now() };
+                    self.circuit = CircuitState::Open {
+                        opened_at: Instant::now(),
+                    };
                     self.state = ProviderState::Down;
                 }
             }
@@ -149,11 +161,18 @@ impl Provider {
 }
 
 impl ProviderPool {
-    pub fn new(upstreams: Vec<(String, String, String)>, strategy: RoutingStrategy, max_failures: u32, reset_secs: u64) -> Self {
+    pub fn new(
+        upstreams: Vec<(String, String, String)>,
+        strategy: RoutingStrategy,
+        max_failures: u32,
+        reset_secs: u64,
+    ) -> Self {
         let reset_timeout = Duration::from_secs(reset_secs);
         let providers: Vec<Provider> = upstreams
             .into_iter()
-            .map(|(url, api_key, name)| Provider::new(url, api_key, name, max_failures, reset_timeout))
+            .map(|(url, api_key, name)| {
+                Provider::new(url, api_key, name, max_failures, reset_timeout)
+            })
             .collect();
 
         Self {
@@ -169,7 +188,9 @@ impl ProviderPool {
         match &self.strategy {
             RoutingStrategy::RoundRobin => {
                 let len = providers.len();
-                if len == 0 { return None; }
+                if len == 0 {
+                    return None;
+                }
 
                 for _ in 0..len {
                     let idx = self.counter.fetch_add(1, Ordering::Relaxed) % len;
@@ -181,8 +202,11 @@ impl ProviderPool {
                 None
             }
             RoutingStrategy::Random => {
-                let available: Vec<&Provider> = providers.iter().filter(|p| p.is_available()).collect();
-                if available.is_empty() { return None; }
+                let available: Vec<&Provider> =
+                    providers.iter().filter(|p| p.is_available()).collect();
+                if available.is_empty() {
+                    return None;
+                }
                 let idx = rand::random::<usize>() % available.len();
                 let p = available[idx];
                 Some((p.url.clone(), p.api_key.clone(), p.name.clone()))
@@ -290,8 +314,16 @@ mod tests {
     #[tokio::test]
     async fn pool_selects_available_provider() {
         let upstreams = vec![
-            ("https://a.example.com".to_string(), "key-a".to_string(), "a".to_string()),
-            ("https://b.example.com".to_string(), "key-b".to_string(), "b".to_string()),
+            (
+                "https://a.example.com".to_string(),
+                "key-a".to_string(),
+                "a".to_string(),
+            ),
+            (
+                "https://b.example.com".to_string(),
+                "key-b".to_string(),
+                "b".to_string(),
+            ),
         ];
         let pool = ProviderPool::new(upstreams, RoutingStrategy::RoundRobin, 2, 30);
         let selected = pool.select().await;
@@ -301,8 +333,16 @@ mod tests {
     #[tokio::test]
     async fn pool_skips_down_provider() {
         let upstreams = vec![
-            ("https://a.example.com".to_string(), "key-a".to_string(), "a".to_string()),
-            ("https://b.example.com".to_string(), "key-b".to_string(), "b".to_string()),
+            (
+                "https://a.example.com".to_string(),
+                "key-a".to_string(),
+                "a".to_string(),
+            ),
+            (
+                "https://b.example.com".to_string(),
+                "key-b".to_string(),
+                "b".to_string(),
+            ),
         ];
         let pool = ProviderPool::new(upstreams, RoutingStrategy::Fallback, 1, 30);
 

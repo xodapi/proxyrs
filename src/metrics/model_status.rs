@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::models::*;
+use std::collections::HashMap;
 
 pub struct ModelStatusBuilder;
 
@@ -12,18 +12,21 @@ impl ModelStatusBuilder {
         let mut model_map: HashMap<String, ModelInfo> = HashMap::new();
 
         for model in all_models {
-            model_map.insert(model.clone(), ModelInfo {
-                model: model.clone(),
-                state: "untested".to_string(),
-                last_seen_ts: None,
-                rate_limit_remaining: None,
-                rate_limit_limit: None,
-                limited: false,
-                error_type: None,
-                last_status: None,
-                today: None,
-                previous_day: None,
-            });
+            model_map.insert(
+                model.clone(),
+                ModelInfo {
+                    model: model.clone(),
+                    state: "untested".to_string(),
+                    last_seen_ts: None,
+                    rate_limit_remaining: None,
+                    rate_limit_limit: None,
+                    limited: false,
+                    error_type: None,
+                    last_status: None,
+                    today: None,
+                    previous_day: None,
+                },
+            );
         }
 
         for e in events {

@@ -48,13 +48,20 @@ impl UsageStore {
             let home = std::env::var("USERPROFILE")
                 .or_else(|_| std::env::var("HOME"))
                 .unwrap_or_else(|_| ".".to_string());
-            PathBuf::from(home).join(".config").join("opencode-proxy").join("usage.jsonl")
+            PathBuf::from(home)
+                .join(".config")
+                .join("opencode-proxy")
+                .join("usage.jsonl")
         };
 
         Self {
             enabled,
             path: store_path,
-            retention_days: if retention_days > 0 { retention_days } else { 30 },
+            retention_days: if retention_days > 0 {
+                retention_days
+            } else {
+                30
+            },
             inner: Mutex::new(UsageStoreInner {
                 pending_events: Vec::new(),
                 last_error: String::new(),
@@ -64,7 +71,9 @@ impl UsageStore {
     }
 
     pub fn record(&self, event: &Event) {
-        if !self.enabled { return; }
+        if !self.enabled {
+            return;
+        }
 
         let stored = StoredEvent {
             ts: event.ts,
@@ -98,7 +107,9 @@ impl UsageStore {
                 if let Err(e) = file.write_all(line.as_bytes()) {
                     inner.last_error = e.to_string();
                 } else {
-                    inner.pending_events.retain(|e| e.ts != stored.ts || e.model != stored.model);
+                    inner
+                        .pending_events
+                        .retain(|e| e.ts != stored.ts || e.model != stored.model);
                     inner.last_error = String::new();
                     let now_ts = stored.ts as u64;
                     if now_ts > inner.last_prune_ts + 3_600_000 {
@@ -117,7 +128,8 @@ impl UsageStore {
     pub fn summary(&self) -> UsageSummary {
         let events = self.read_events();
         let inner = self.inner.lock().unwrap();
-        let all_stored: Vec<StoredEvent> = events.into_iter()
+        let all_stored: Vec<StoredEvent> = events
+            .into_iter()
             .chain(inner.pending_events.clone())
             .collect();
         drop(inner);
@@ -173,11 +185,13 @@ impl UsageStore {
     fn prune(&self, now_ts: u64) {
         let cutoff = now_ts - (self.retention_days as u64 * 86400 * 1000);
         let events = self.read_events();
-        let filtered: Vec<StoredEvent> = events.into_iter()
+        let filtered: Vec<StoredEvent> = events
+            .into_iter()
             .filter(|e| (e.ts as u64) >= cutoff)
             .collect();
 
-        let lines: Vec<String> = filtered.iter()
+        let lines: Vec<String> = filtered
+            .iter()
             .map(|e| serde_json::to_string(e).unwrap_or_default() + "\n")
             .collect();
 
@@ -206,25 +220,30 @@ fn summarize_usage(
         }
     }
 
-    let mut by_day: Vec<DayUsage> = day_map.into_iter()
+    let mut by_day: Vec<DayUsage> = day_map
+        .into_iter()
         .map(|(day, events)| aggregate_day(&day, &events))
         .collect();
     by_day.sort_by(|a, b| b.day.cmp(&a.day));
 
-    let today_events: Vec<&StoredEvent> = recent.iter()
+    let today_events: Vec<&StoredEvent> = recent
+        .iter()
         .filter(|e| {
             chrono::DateTime::from_timestamp_millis(e.ts)
                 .map(|dt| dt.format("%Y-%m-%d").to_string() == today_str)
                 .unwrap_or(false)
         })
-        .cloned().collect();
+        .cloned()
+        .collect();
 
     let by_model_today = aggregate_by_model(&today_events);
 
     let cutoff_24h = (now.timestamp_millis() - 86400 * 1000) as i64;
-    let events_24h: Vec<&StoredEvent> = recent.iter()
+    let events_24h: Vec<&StoredEvent> = recent
+        .iter()
         .filter(|e| e.ts >= cutoff_24h)
-        .cloned().collect();
+        .cloned()
+        .collect();
     let by_model_24h = aggregate_by_model(&events_24h);
 
     let totals: Option<UsageTotals> = {
@@ -244,7 +263,11 @@ fn summarize_usage(
 
     UsageSummary {
         enabled,
-        path: if enabled { Some(path.to_string_lossy().to_string()) } else { None },
+        path: if enabled {
+            Some(path.to_string_lossy().to_string())
+        } else {
+            None
+        },
         today: today_str,
         totals,
         by_day,
@@ -256,15 +279,27 @@ fn summarize_usage(
 fn aggregate_day(day: &str, events: &[&StoredEvent]) -> DayUsage {
     let mut usage = DayUsage {
         day: day.to_string(),
-        requests: 0, ok: 0, fail: 0, rate_limited: 0,
-        total_tokens: 0, prompt_tokens: 0, completion_tokens: 0,
-        latency_ms_avg: 0, cost: 0.0,
+        requests: 0,
+        ok: 0,
+        fail: 0,
+        rate_limited: 0,
+        total_tokens: 0,
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        latency_ms_avg: 0,
+        cost: 0.0,
     };
     let mut latency_sum: u64 = 0;
     for e in events {
         usage.requests += 1;
-        if e.ok { usage.ok += 1; } else { usage.fail += 1; }
-        if e.rate_limited { usage.rate_limited += 1; }
+        if e.ok {
+            usage.ok += 1;
+        } else {
+            usage.fail += 1;
+        }
+        if e.rate_limited {
+            usage.rate_limited += 1;
+        }
         usage.total_tokens += e.total_tokens;
         usage.prompt_tokens += e.prompt_tokens;
         usage.completion_tokens += e.completion_tokens;
@@ -283,19 +318,34 @@ fn aggregate_by_model(events: &[&StoredEvent]) -> Vec<ModelUsage> {
         model_map.entry(e.model.clone()).or_default().push(e);
     }
 
-    let mut result: Vec<ModelUsage> = model_map.into_iter()
+    let mut result: Vec<ModelUsage> = model_map
+        .into_iter()
         .map(|(model, events)| {
             let mut mu = ModelUsage {
-                model, requests: 0, ok: 0, fail: 0, rate_limited: 0,
-                total_tokens: 0, prompt_tokens: 0, completion_tokens: 0,
-                latency_ms_avg: 0, cost: 0.0,
-                usage_reported: 0, usage_estimated: 0,
+                model,
+                requests: 0,
+                ok: 0,
+                fail: 0,
+                rate_limited: 0,
+                total_tokens: 0,
+                prompt_tokens: 0,
+                completion_tokens: 0,
+                latency_ms_avg: 0,
+                cost: 0.0,
+                usage_reported: 0,
+                usage_estimated: 0,
             };
             let mut latency_sum: u64 = 0;
             for e in &events {
                 mu.requests += 1;
-                if e.ok { mu.ok += 1; } else { mu.fail += 1; }
-                if e.rate_limited { mu.rate_limited += 1; }
+                if e.ok {
+                    mu.ok += 1;
+                } else {
+                    mu.fail += 1;
+                }
+                if e.rate_limited {
+                    mu.rate_limited += 1;
+                }
                 mu.total_tokens += e.total_tokens;
                 mu.prompt_tokens += e.prompt_tokens;
                 mu.completion_tokens += e.completion_tokens;

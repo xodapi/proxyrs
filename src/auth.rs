@@ -1,10 +1,15 @@
 const MANAGEMENT_PATHS: &[&str] = &[
-    "/dashboard", "/flow", "/metrics", "/usage", "/limits", "/diag", "/export",
+    "/dashboard",
+    "/flow",
+    "/metrics",
+    "/usage",
+    "/limits",
+    "/diag",
+    "/export",
 ];
 
 pub fn is_management_path(path: &str) -> bool {
-    MANAGEMENT_PATHS.contains(&path)
-        || path.starts_with("/export/")
+    MANAGEMENT_PATHS.contains(&path) || path.starts_with("/export/")
 }
 
 pub fn is_authorized(token: &str, header: Option<&str>) -> bool {

@@ -74,10 +74,8 @@ impl Config {
             .and_then(|v| v.parse().ok())
             .unwrap_or(DEFAULT_PORT);
 
-        let upstream = env::var("UPSTREAM_URL")
-            .unwrap_or_else(|_| DEFAULT_UPSTREAM.to_string());
-        let api_key = env::var("OPENCODE_ZEN_API_KEY")
-            .unwrap_or_else(|_| "public".to_string());
+        let upstream = env::var("UPSTREAM_URL").unwrap_or_else(|_| DEFAULT_UPSTREAM.to_string());
+        let api_key = env::var("OPENCODE_ZEN_API_KEY").unwrap_or_else(|_| "public".to_string());
         let upstreams = parse_upstreams(&upstream, &api_key);
 
         let routing = match env::var("ROUTING").ok() {
@@ -116,7 +114,10 @@ impl Config {
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(DEFAULT_USAGE_RETENTION_DAYS),
             logger: true,
-            access_log: env::var("ACCESS_LOG").ok().map(|v| v != "0" && v != "false").unwrap_or(true),
+            access_log: env::var("ACCESS_LOG")
+                .ok()
+                .map(|v| v != "0" && v != "false")
+                .unwrap_or(true),
             probe_interval_ms: env::var("PROBE_INTERVAL")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -151,12 +152,15 @@ fn parse_upstreams(upstream: &str, default_key: &str) -> Vec<(String, String, St
         .filter(|s| !s.is_empty())
         .collect();
 
-    urls.into_iter().enumerate().map(|(i, url)| {
-        let name = format!("provider-{}", i + 1);
-        let key_env = format!("API_KEY_{}", i + 1);
-        let api_key = std::env::var(&key_env).unwrap_or_else(|_| default_key.to_string());
-        (url, api_key, name)
-    }).collect()
+    urls.into_iter()
+        .enumerate()
+        .map(|(i, url)| {
+            let name = format!("provider-{}", i + 1);
+            let key_env = format!("API_KEY_{}", i + 1);
+            let api_key = std::env::var(&key_env).unwrap_or_else(|_| default_key.to_string());
+            (url, api_key, name)
+        })
+        .collect()
 }
 
 #[cfg(test)]

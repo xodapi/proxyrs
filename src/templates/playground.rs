@@ -1,5 +1,6 @@
 pub fn render(version: &str, model: &str, base_url: &str) -> String {
-    format!(r#"<!doctype html>
+    format!(
+        r#"<!doctype html>
 <html lang="ru" data-theme="dark">
 <head>
   <meta charset="utf-8">
@@ -156,5 +157,6 @@ pub fn render(version: &str, model: &str, base_url: &str) -> String {
     }}
   </script>
 </body>
-</html>"#)
+</html>"#
+    )
 }

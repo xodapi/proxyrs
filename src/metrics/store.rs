@@ -59,10 +59,7 @@ impl MetricsStore {
     }
 
     pub fn uptime_secs(&self) -> u64 {
-        self.started_at
-            .elapsed()
-            .unwrap_or_default()
-            .as_secs()
+        self.started_at.elapsed().unwrap_or_default().as_secs()
     }
 }
 

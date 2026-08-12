@@ -1,5 +1,6 @@
 pub fn render(version: &str) -> String {
-    let h = format!(r##"<!doctype html>
+    let h = format!(
+        r##"<!doctype html>
 <html lang="ru" data-theme="dark">
 <head>
   <meta charset="utf-8">
@@ -151,6 +152,7 @@ pub fn render(version: &str) -> String {
     setInterval(refresh, 3000);
   </script>
 </body>
-</html>"##);
+</html>"##
+    );
     h
 }

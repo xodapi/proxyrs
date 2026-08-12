@@ -3,7 +3,7 @@ use std::time::Instant;
 use axum::{
     body::Body,
     extract::State,
-    http::{HeaderMap, StatusCode, header, HeaderValue},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     response::Response,
 };
 use futures::stream::StreamExt;
@@ -16,12 +16,19 @@ use crate::models::Event;
 use crate::server::AppState;
 
 const SAFE_UPSTREAM_HEADERS: &[&str] = &[
-    "retry-after", "ratelimit-reset", "rate-limit-reset",
-    "x-ratelimit-reset", "x-rate-limit-reset",
-    "ratelimit-remaining", "rate-limit-remaining",
-    "x-ratelimit-remaining", "x-rate-limit-remaining",
-    "ratelimit-limit", "rate-limit-limit",
-    "x-ratelimit-limit", "x-rate-limit-limit",
+    "retry-after",
+    "ratelimit-reset",
+    "rate-limit-reset",
+    "x-ratelimit-reset",
+    "x-rate-limit-reset",
+    "ratelimit-remaining",
+    "rate-limit-remaining",
+    "x-ratelimit-remaining",
+    "x-rate-limit-remaining",
+    "ratelimit-limit",
+    "rate-limit-limit",
+    "x-ratelimit-limit",
+    "x-rate-limit-limit",
 ];
 
 pub async fn chat_completions_handler(
@@ -30,7 +37,12 @@ pub async fn chat_completions_handler(
     body: String,
 ) -> Response<Body> {
     let started_at = Instant::now();
-    let request_id = uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("?").to_string();
+    let request_id = uuid::Uuid::new_v4()
+        .to_string()
+        .split('-')
+        .next()
+        .unwrap_or("?")
+        .to_string();
 
     let json_body: Value = match serde_json::from_str(&body) {
         Ok(v) => v,
@@ -46,7 +58,10 @@ pub async fn chat_completions_handler(
         .and_then(|m| m.as_str())
         .unwrap_or("auto");
     let selected_model = state.router.select(requested_model);
-    let is_streaming = json_body.get("stream").and_then(|s| s.as_bool()).unwrap_or(false);
+    let is_streaming = json_body
+        .get("stream")
+        .and_then(|s| s.as_bool())
+        .unwrap_or(false);
 
     let mut last_err: Option<String> = None;
     let mut attempts = 0;
@@ -81,13 +96,19 @@ pub async fn chat_completions_handler(
                 let is_ok = upstream_status < 400;
 
                 if !is_ok {
-                    state.provider_pool.record_result(&provider_name, false, upstream_status, 0).await;
+                    state
+                        .provider_pool
+                        .record_result(&provider_name, false, upstream_status, 0)
+                        .await;
                     last_err = Some(format!("{}: {}", provider_name, upstream_status));
                     attempts += 1;
                     continue;
                 }
 
-                state.provider_pool.record_result(&provider_name, true, upstream_status, 0).await;
+                state
+                    .provider_pool
+                    .record_result(&provider_name, true, upstream_status, 0)
+                    .await;
 
                 let mut safe_headers = Vec::new();
                 for name in SAFE_UPSTREAM_HEADERS {
@@ -111,22 +132,50 @@ pub async fn chat_completions_handler(
                 }
 
                 if is_streaming {
-                    resp_headers.insert(header::CONTENT_TYPE, "text/event-stream; charset=utf-8".parse().unwrap());
-                    return handle_streaming(state, upstream_response, selected_model, started_at, upstream_status, resp_headers).await;
+                    resp_headers.insert(
+                        header::CONTENT_TYPE,
+                        "text/event-stream; charset=utf-8".parse().unwrap(),
+                    );
+                    return handle_streaming(
+                        state,
+                        upstream_response,
+                        selected_model,
+                        started_at,
+                        upstream_status,
+                        resp_headers,
+                    )
+                    .await;
                 } else {
-                    resp_headers.insert(header::CONTENT_TYPE, "application/json; charset=utf-8".parse().unwrap());
-                    return handle_non_streaming(state, upstream_response, selected_model, started_at, upstream_status, resp_headers).await;
+                    resp_headers.insert(
+                        header::CONTENT_TYPE,
+                        "application/json; charset=utf-8".parse().unwrap(),
+                    );
+                    return handle_non_streaming(
+                        state,
+                        upstream_response,
+                        selected_model,
+                        started_at,
+                        upstream_status,
+                        resp_headers,
+                    )
+                    .await;
                 }
             }
             Err(e) => {
-                state.provider_pool.record_result(&provider_name, false, 502, 0).await;
+                state
+                    .provider_pool
+                    .record_result(&provider_name, false, 502, 0)
+                    .await;
                 last_err = Some(format!("{}: {}", provider_name, e));
                 attempts += 1;
             }
         }
     }
 
-    err_response(StatusCode::BAD_GATEWAY, &last_err.unwrap_or_else(|| "all providers failed".to_string()))
+    err_response(
+        StatusCode::BAD_GATEWAY,
+        &last_err.unwrap_or_else(|| "all providers failed".to_string()),
+    )
 }
 
 pub async fn playground_test_handler(
@@ -134,18 +183,41 @@ pub async fn playground_test_handler(
     body: String,
 ) -> Response<Body> {
     let started_at = Instant::now();
-    let request_id = uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("?").to_string();
+    let request_id = uuid::Uuid::new_v4()
+        .to_string()
+        .split('-')
+        .next()
+        .unwrap_or("?")
+        .to_string();
 
     let json_body: Value = match serde_json::from_str(&body) {
         Ok(v) => v,
         Err(_) => return err_response(StatusCode::BAD_REQUEST, "invalid JSON"),
     };
 
-    let model = json_body.get("model").and_then(|m| m.as_str()).unwrap_or("auto");
-    let base_url = json_body.get("baseUrl").and_then(|u| u.as_str()).unwrap_or(&state.config.upstream).trim_end_matches('/').to_string();
-    let api_key = json_body.get("apiKey").and_then(|k| k.as_str()).unwrap_or("").to_string();
-    let prompt = json_body.get("prompt").and_then(|p| p.as_str()).unwrap_or("");
-    let is_streaming = json_body.get("stream").and_then(|s| s.as_bool()).unwrap_or(false);
+    let model = json_body
+        .get("model")
+        .and_then(|m| m.as_str())
+        .unwrap_or("auto");
+    let base_url = json_body
+        .get("baseUrl")
+        .and_then(|u| u.as_str())
+        .unwrap_or(&state.config.upstream)
+        .trim_end_matches('/')
+        .to_string();
+    let api_key = json_body
+        .get("apiKey")
+        .and_then(|k| k.as_str())
+        .unwrap_or("")
+        .to_string();
+    let prompt = json_body
+        .get("prompt")
+        .and_then(|p| p.as_str())
+        .unwrap_or("");
+    let is_streaming = json_body
+        .get("stream")
+        .and_then(|s| s.as_bool())
+        .unwrap_or(false);
 
     if prompt.is_empty() {
         return err_response(StatusCode::BAD_REQUEST, "prompt is required");
@@ -180,8 +252,26 @@ pub async fn playground_test_handler(
         Err(e) => {
             let latency_ms = started_at.elapsed().as_millis() as u64;
             let err_msg = e.to_string();
-            let error_type = if err_msg.contains("timeout") { "timeout" } else { "network" };
-            record_event(&state, model, false, 502, latency_ms, 0, 0, 0, Some(error_type.to_string()), false, None, false, false);
+            let error_type = if err_msg.contains("timeout") {
+                "timeout"
+            } else {
+                "network"
+            };
+            record_event(
+                &state,
+                model,
+                false,
+                502,
+                latency_ms,
+                0,
+                0,
+                0,
+                Some(error_type.to_string()),
+                false,
+                None,
+                false,
+                false,
+            );
             return err_response(StatusCode::BAD_GATEWAY, &err_msg);
         }
     };
@@ -209,11 +299,33 @@ pub async fn playground_test_handler(
     }
 
     if is_streaming {
-        resp_headers.insert(header::CONTENT_TYPE, "text/event-stream; charset=utf-8".parse().unwrap());
-        handle_streaming(state, upstream_response, model.to_string(), started_at, upstream_status, resp_headers).await
+        resp_headers.insert(
+            header::CONTENT_TYPE,
+            "text/event-stream; charset=utf-8".parse().unwrap(),
+        );
+        handle_streaming(
+            state,
+            upstream_response,
+            model.to_string(),
+            started_at,
+            upstream_status,
+            resp_headers,
+        )
+        .await
     } else {
-        resp_headers.insert(header::CONTENT_TYPE, "application/json; charset=utf-8".parse().unwrap());
-        handle_non_streaming(state, upstream_response, model.to_string(), started_at, upstream_status, resp_headers).await
+        resp_headers.insert(
+            header::CONTENT_TYPE,
+            "application/json; charset=utf-8".parse().unwrap(),
+        );
+        handle_non_streaming(
+            state,
+            upstream_response,
+            model.to_string(),
+            started_at,
+            upstream_status,
+            resp_headers,
+        )
+        .await
     }
 }
 
@@ -228,10 +340,8 @@ fn err_response(status: StatusCode, msg: &str) -> Response<Body> {
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
     );
-    resp.headers_mut().insert(
-        header::X_FRAME_OPTIONS,
-        HeaderValue::from_static("DENY"),
-    );
+    resp.headers_mut()
+        .insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
     resp
 }
 
@@ -250,7 +360,21 @@ async fn handle_non_streaming(
         Ok(b) => b,
         Err(e) => {
             let latency_ms = started_at.elapsed().as_millis() as u64;
-            record_event(&state, &selected_model, false, 502, latency_ms, 0, 0, 0, Some("upstream_read_error".to_string()), false, None, false, false);
+            record_event(
+                &state,
+                &selected_model,
+                false,
+                502,
+                latency_ms,
+                0,
+                0,
+                0,
+                Some("upstream_read_error".to_string()),
+                false,
+                None,
+                false,
+                false,
+            );
             return err_response(StatusCode::BAD_GATEWAY, &e.to_string());
         }
     };
@@ -275,16 +399,35 @@ async fn handle_non_streaming(
         (0, 0, 0, false)
     };
 
-    let (prompt, completion, total, usage_reported, usage_estimated) =
-        if is_ok && !usage_reported {
-            let body_str = String::from_utf8_lossy(&upstream_body);
-            let estimated = estimate_tokens(&body_str);
-            (estimated.0, estimated.1, estimated.0 + estimated.1, false, true)
-        } else { (prompt, completion, total, usage_reported, false) };
+    let (prompt, completion, total, usage_reported, usage_estimated) = if is_ok && !usage_reported {
+        let body_str = String::from_utf8_lossy(&upstream_body);
+        let estimated = estimate_tokens(&body_str);
+        (
+            estimated.0,
+            estimated.1,
+            estimated.0 + estimated.1,
+            false,
+            true,
+        )
+    } else {
+        (prompt, completion, total, usage_reported, false)
+    };
 
-    record_event(&state, &selected_model, is_ok, upstream_status, latency_ms,
-        prompt, completion, total, error_type, is_rate_limited,
-        Some(&finish_reason), usage_reported, usage_estimated);
+    record_event(
+        &state,
+        &selected_model,
+        is_ok,
+        upstream_status,
+        latency_ms,
+        prompt,
+        completion,
+        total,
+        error_type,
+        is_rate_limited,
+        Some(&finish_reason),
+        usage_reported,
+        usage_estimated,
+    );
 
     let status = StatusCode::from_u16(upstream_status).unwrap_or(StatusCode::OK);
     let mut resp = Response::new(Body::from(upstream_body.to_vec()));
@@ -292,10 +435,8 @@ async fn handle_non_streaming(
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
     );
-    resp.headers_mut().insert(
-        header::X_FRAME_OPTIONS,
-        HeaderValue::from_static("DENY"),
-    );
+    resp.headers_mut()
+        .insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
     *resp.status_mut() = status;
     *resp.headers_mut() = resp_headers;
     resp
@@ -330,10 +471,14 @@ async fn handle_streaming(
                             }
                         }
                     }
-                    if tx.send(Ok(chunk)).await.is_err() { break; }
+                    if tx.send(Ok(chunk)).await.is_err() {
+                        break;
+                    }
                 }
                 Err(e) => {
-                    let _ = tx.send(Err(std::io::Error::new(std::io::ErrorKind::Other, e))).await;
+                    let _ = tx
+                        .send(Err(std::io::Error::new(std::io::ErrorKind::Other, e)))
+                        .await;
                     break;
                 }
             }
@@ -342,15 +487,32 @@ async fn handle_streaming(
         let latency_ms = started_at.elapsed().as_millis() as u64;
         let (prompt, completion, total, usage_reported) = if !last_usage_json.is_empty() {
             extract_usage_from_sse(&last_usage_json)
-        } else { (0, 0, 0, false) };
+        } else {
+            (0, 0, 0, false)
+        };
 
         let (prompt, completion, total, usage_reported, usage_estimated) =
             if !usage_reported && total_received > 0 {
                 (0, 0, 0, false, true)
-            } else { (prompt, completion, total, usage_reported, false) };
+            } else {
+                (prompt, completion, total, usage_reported, false)
+            };
 
-        record_event(&state_clone, &model_clone, true, upstream_status, latency_ms,
-            prompt, completion, total, None, false, Some("stop"), usage_reported, usage_estimated);
+        record_event(
+            &state_clone,
+            &model_clone,
+            true,
+            upstream_status,
+            latency_ms,
+            prompt,
+            completion,
+            total,
+            None,
+            false,
+            Some("stop"),
+            usage_reported,
+            usage_estimated,
+        );
     });
 
     let stream = ReceiverStream::new(rx);
@@ -361,10 +523,8 @@ async fn handle_streaming(
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
     );
-    resp.headers_mut().insert(
-        header::X_FRAME_OPTIONS,
-        HeaderValue::from_static("DENY"),
-    );
+    resp.headers_mut()
+        .insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
     *resp.status_mut() = status;
     *resp.headers_mut() = resp_headers;
     resp
@@ -376,16 +536,27 @@ fn extract_usage_from_body(body: &[u8]) -> (u64, u64, u64, bool, String) {
         Err(_) => return (0, 0, 0, false, "stop".to_string()),
     };
     let finish_reason = parsed
-        .get("choices").and_then(|c| c.as_array())
+        .get("choices")
+        .and_then(|c| c.as_array())
         .and_then(|arr| arr.first())
         .and_then(|c| c.get("finish_reason"))
         .and_then(|f| f.as_str())
-        .unwrap_or("stop").to_string();
+        .unwrap_or("stop")
+        .to_string();
     match parsed.get("usage") {
         Some(usage) => {
-            let p = usage.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-            let c = usage.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-            let t = usage.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(p + c);
+            let p = usage
+                .get("prompt_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let c = usage
+                .get("completion_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let t = usage
+                .get("total_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(p + c);
             (p, c, t, true, finish_reason)
         }
         None => (0, 0, 0, false, finish_reason),
@@ -399,9 +570,18 @@ fn extract_usage_from_sse(data: &str) -> (u64, u64, u64, bool) {
     };
     match parsed.get("usage") {
         Some(usage) => {
-            let p = usage.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-            let c = usage.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-            let t = usage.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(p + c);
+            let p = usage
+                .get("prompt_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let c = usage
+                .get("completion_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let t = usage
+                .get("total_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(p + c);
             (p, c, t, true)
         }
         None => (0, 0, 0, false),

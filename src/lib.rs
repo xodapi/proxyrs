@@ -1,15 +1,15 @@
-pub mod config;
-pub mod models;
-pub mod router;
 pub mod auth;
-pub mod utils;
-pub mod metrics;
-pub mod usage_store;
-pub mod templates;
-pub mod export;
-pub mod server;
-pub mod proxy;
 pub mod circuit_breaker;
+pub mod config;
+pub mod export;
+pub mod metrics;
+pub mod models;
+pub mod proxy;
+pub mod router;
+pub mod server;
+pub mod templates;
+pub mod usage_store;
+pub mod utils;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const APP_NAME: &str = env!("CARGO_PKG_NAME");

@@ -1,21 +1,25 @@
 use axum::{
-    Router, body::Body,
+    body::Body,
     extract::State,
-    http::{StatusCode, header, HeaderValue},
-    response::{Json, IntoResponse, Response},
+    http::{header, HeaderValue, StatusCode},
+    response::{IntoResponse, Json, Response},
     routing::{get, post},
+    Router,
 };
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
 
 use crate::{
-    auth, circuit_breaker::{ProviderPool, RoutingStrategy}, config::Config, export,
-    metrics::{MetricsStore, SnapshotBuilder, ModelStatusBuilder},
+    auth,
+    circuit_breaker::{ProviderPool, RoutingStrategy},
+    config::Config,
+    export,
+    metrics::{MetricsStore, ModelStatusBuilder, SnapshotBuilder},
     models::*,
     proxy, router, templates,
     usage_store::UsageStore,
-    VERSION, APP_NAME,
+    APP_NAME, VERSION,
 };
 
 fn csp_dashboard() -> &'static str {
@@ -27,7 +31,11 @@ fn csp_flow() -> &'static str {
 }
 
 fn apply_security_headers<B>(resp: &mut Response<B>, is_dashboard: bool) {
-    let csp = if is_dashboard { csp_dashboard() } else { csp_flow() };
+    let csp = if is_dashboard {
+        csp_dashboard()
+    } else {
+        csp_flow()
+    };
     resp.headers_mut().insert(
         header::CONTENT_SECURITY_POLICY,
         HeaderValue::from_str(csp).unwrap(),
@@ -36,10 +44,8 @@ fn apply_security_headers<B>(resp: &mut Response<B>, is_dashboard: bool) {
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
     );
-    resp.headers_mut().insert(
-        header::X_FRAME_OPTIONS,
-        HeaderValue::from_static("DENY"),
-    );
+    resp.headers_mut()
+        .insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
 }
 
 #[derive(Clone)]
@@ -91,7 +97,10 @@ pub fn build_router(config: Config) -> Router {
         router: router::Router::new(config.models.clone(), routing_strategy),
         config: config.clone(),
         metrics: Arc::new(Mutex::new(MetricsStore::new(max_events))),
-        usage_store: Arc::new(Mutex::new(UsageStore::new(&config.usage_db_path, config.usage_retention_days))),
+        usage_store: Arc::new(Mutex::new(UsageStore::new(
+            &config.usage_db_path,
+            config.usage_retention_days,
+        ))),
         provider_pool,
         started_at: std::time::Instant::now(),
     };
@@ -109,7 +118,10 @@ pub fn build_router(config: Config) -> Router {
         .route("/limits", get(limits_handler))
         .route("/providers", get(providers_handler))
         .route("/export/{format}", get(export_handler))
-        .route("/v1/chat/completions", post(proxy::chat_completions_handler))
+        .route(
+            "/v1/chat/completions",
+            post(proxy::chat_completions_handler),
+        )
         .with_state(state)
 }
 
@@ -134,17 +146,20 @@ async fn health_handler() -> Json<serde_json::Value> {
     Json(serde_json::json!({ "status": "ok" }))
 }
 
-async fn models_handler(
-    State(state): State<AppState>,
-) -> Json<serde_json::Value> {
-    let models: Vec<serde_json::Value> = state.config.models.iter().map(|m| {
-        serde_json::json!({
-            "id": m,
-            "object": "model",
-            "created": 0,
-            "owned_by": "opencode"
+async fn models_handler(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let models: Vec<serde_json::Value> = state
+        .config
+        .models
+        .iter()
+        .map(|m| {
+            serde_json::json!({
+                "id": m,
+                "object": "model",
+                "created": 0,
+                "owned_by": "opencode"
+            })
         })
-    }).collect();
+        .collect();
     Json(serde_json::json!({ "object": "list", "data": models }))
 }
 
@@ -155,7 +170,10 @@ async fn dashboard_handler(
     require_auth(&state, &headers)?;
     let html = templates::dashboard::render(VERSION);
     let mut resp = Response::new(Body::from(html));
-    resp.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("text/html; charset=utf-8"));
+    resp.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/html; charset=utf-8"),
+    );
     apply_security_headers(&mut resp, true);
     Ok(resp)
 }
@@ -167,7 +185,10 @@ async fn flow_handler(
     require_auth(&state, &headers)?;
     let html = templates::flow::render(VERSION);
     let mut resp = Response::new(Body::from(html));
-    resp.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("text/html; charset=utf-8"));
+    resp.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/html; charset=utf-8"),
+    );
     apply_security_headers(&mut resp, false);
     Ok(resp)
 }
@@ -177,11 +198,19 @@ async fn playground_handler(
     headers: axum::http::HeaderMap,
 ) -> Result<Response<Body>, (StatusCode, &'static str)> {
     require_auth(&state, &headers)?;
-    let model = state.config.models.first().cloned().unwrap_or_else(|| "gpt-5".to_string());
+    let model = state
+        .config
+        .models
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "gpt-5".to_string());
     let base_url = state.config.upstream.trim_end_matches('/').to_string();
     let html = templates::playground::render(VERSION, &model, &base_url);
     let mut resp = Response::new(Body::from(html));
-    resp.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("text/html; charset=utf-8"));
+    resp.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/html; charset=utf-8"),
+    );
     apply_security_headers(&mut resp, false);
     Ok(resp)
 }
@@ -194,12 +223,20 @@ async fn metrics_handler(
 
     let metrics = state.metrics.lock().unwrap();
     let all_events: Vec<Event> = metrics.events().iter().cloned().collect();
-    let model_status = ModelStatusBuilder::build(&all_events, &state.config.models, &state.config.primary_models);
+    let model_status = ModelStatusBuilder::build(
+        &all_events,
+        &state.config.models,
+        &state.config.primary_models,
+    );
     let usage = state.usage_store.lock().unwrap().summary();
 
     let snapshot = SnapshotBuilder::build(
-        &metrics, 300_000, &model_status, usage,
-        &state.config.primary_models, &state.config.routing,
+        &metrics,
+        300_000,
+        &model_status,
+        usage,
+        &state.config.primary_models,
+        &state.config.routing,
     );
 
     Ok(Json(snapshot))
@@ -215,9 +252,20 @@ async fn diag_handler(
 
     let metrics = state.metrics.lock().unwrap();
     let all_events: Vec<Event> = metrics.events().iter().cloned().collect();
-    let model_status = ModelStatusBuilder::build(&all_events, &state.config.models, &state.config.primary_models);
+    let model_status = ModelStatusBuilder::build(
+        &all_events,
+        &state.config.models,
+        &state.config.primary_models,
+    );
     let usage = state.usage_store.lock().unwrap().summary();
-    let snapshot = SnapshotBuilder::build(&metrics, 300_000, &model_status, usage, &state.config.primary_models, &state.config.routing);
+    let snapshot = SnapshotBuilder::build(
+        &metrics,
+        300_000,
+        &model_status,
+        usage,
+        &state.config.primary_models,
+        &state.config.routing,
+    );
     drop(metrics);
 
     let s = &snapshot.summary.window;
@@ -233,21 +281,27 @@ async fn diag_handler(
         uptime_human: format!("{}h {}m", h, m),
         generated_at: snapshot.generated_at,
         routing: state.config.routing.clone(),
-        providers: provider_snapshots.iter().map(|s| DiagProvider {
-            name: s.name.clone(),
-            url: s.url.clone(),
-            state: s.state.clone(),
-            circuit: s.circuit.clone(),
-            total_requests: s.total_requests,
-            total_failures: s.total_failures,
-        }).collect(),
+        providers: provider_snapshots
+            .iter()
+            .map(|s| DiagProvider {
+                name: s.name.clone(),
+                url: s.url.clone(),
+                state: s.state.clone(),
+                circuit: s.circuit.clone(),
+                total_requests: s.total_requests,
+                total_failures: s.total_failures,
+            })
+            .collect(),
         models_count: state.config.models.len(),
         primary_models_count: primary.len(),
-        primary_models: primary.iter().map(|m| DiagModel {
-            model: m.model.clone(),
-            state: m.state.clone(),
-            limited: m.limited,
-        }).collect(),
+        primary_models: primary
+            .iter()
+            .map(|m| DiagModel {
+                model: m.model.clone(),
+                state: m.state.clone(),
+                limited: m.limited,
+            })
+            .collect(),
         window_5min: DiagWindow {
             requests: s.requests,
             ok: s.ok,
@@ -257,7 +311,14 @@ async fn diag_handler(
             latency_ms_max: s.latency_ms_max,
             tokens_per_minute: s.tokens_per_minute,
         },
-        health: if s.fail > s.ok { "error" } else if (s.fail as f64) > (s.requests as f64) * 0.2 { "warn" } else { "ok" }.to_string(),
+        health: if s.fail > s.ok {
+            "error"
+        } else if (s.fail as f64) > (s.requests as f64) * 0.2 {
+            "warn"
+        } else {
+            "ok"
+        }
+        .to_string(),
         errors: vec![],
     };
 
@@ -270,7 +331,9 @@ async fn usage_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, &'static str)> {
     require_auth(&state, &headers)?;
     let usage = state.usage_store.lock().unwrap().summary();
-    Ok(Json(serde_json::to_value(&usage).unwrap_or(serde_json::json!({ "enabled": false }))))
+    Ok(Json(
+        serde_json::to_value(&usage).unwrap_or(serde_json::json!({ "enabled": false })),
+    ))
 }
 
 async fn limits_handler(
@@ -281,8 +344,14 @@ async fn limits_handler(
 
     let metrics = state.metrics.lock().unwrap();
     let all_events: Vec<Event> = metrics.events().iter().cloned().collect();
-    let model_status = ModelStatusBuilder::build(&all_events, &state.config.models, &state.config.primary_models);
-    let limits: Vec<Limit> = model_status.all.iter()
+    let model_status = ModelStatusBuilder::build(
+        &all_events,
+        &state.config.models,
+        &state.config.primary_models,
+    );
+    let limits: Vec<Limit> = model_status
+        .all
+        .iter()
         .filter(|m| m.limited || m.rate_limit_remaining.is_some())
         .map(|m| Limit {
             model: m.model.clone(),
@@ -329,8 +398,5 @@ async fn export_handler(
         _ => export::generate_csv(&usage),
     };
 
-    Ok((
-        [("Content-Type", content_type)],
-        body,
-    ))
+    Ok(([("Content-Type", content_type)], body))
 }

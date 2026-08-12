@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use chrono::Utc;
+use std::collections::HashMap;
 
-use crate::models::*;
 use crate::metrics::store::MetricsStore;
+use crate::models::*;
 
 pub struct SnapshotBuilder;
 
@@ -52,7 +52,9 @@ impl SnapshotBuilder {
                 stores_prompts: false,
                 stores_responses: false,
                 stores_api_keys: false,
-                note: "Prompts, responses, API keys, session IDs, and local paths are never stored.".to_string(),
+                note:
+                    "Prompts, responses, API keys, session IDs, and local paths are never stored."
+                        .to_string(),
             },
             routing: routing.to_string(),
             app: "opencode-proxy".to_string(),
@@ -62,11 +64,19 @@ impl SnapshotBuilder {
 
     fn summarize_events(events: &[Event]) -> WindowSummary {
         let mut total = WindowSummary {
-            requests: 0, ok: 0, fail: 0, rate_limited: 0,
-            prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
-            latency_ms_avg: 0, latency_ms_max: 0,
-            tokens_per_minute: 0.0, requests_per_minute: 0.0,
-            uptime_seconds: None, cost: 0.0,
+            requests: 0,
+            ok: 0,
+            fail: 0,
+            rate_limited: 0,
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+            latency_ms_avg: 0,
+            latency_ms_max: 0,
+            tokens_per_minute: 0.0,
+            requests_per_minute: 0.0,
+            uptime_seconds: None,
+            cost: 0.0,
         };
 
         if events.is_empty() {
@@ -79,19 +89,35 @@ impl SnapshotBuilder {
 
         for e in events {
             total.requests += 1;
-            if e.ok { total.ok += 1; } else { total.fail += 1; }
-            if e.rate_limited { total.rate_limited += 1; }
+            if e.ok {
+                total.ok += 1;
+            } else {
+                total.fail += 1;
+            }
+            if e.rate_limited {
+                total.rate_limited += 1;
+            }
             total.prompt_tokens += e.prompt_tokens;
             total.completion_tokens += e.completion_tokens;
             total.total_tokens += e.total_tokens;
             latency_sum += e.latency_ms;
-            if e.latency_ms > total.latency_ms_max { total.latency_ms_max = e.latency_ms; }
+            if e.latency_ms > total.latency_ms_max {
+                total.latency_ms_max = e.latency_ms;
+            }
             total.cost += e.cost;
-            if e.ts < first_ts { first_ts = e.ts; }
-            if e.ts > last_ts { last_ts = e.ts; }
+            if e.ts < first_ts {
+                first_ts = e.ts;
+            }
+            if e.ts > last_ts {
+                last_ts = e.ts;
+            }
         }
 
-        total.latency_ms_avg = if total.requests > 0 { latency_sum / total.requests } else { 0 };
+        total.latency_ms_avg = if total.requests > 0 {
+            latency_sum / total.requests
+        } else {
+            0
+        };
 
         let duration_min = if last_ts > first_ts {
             ((last_ts - first_ts) as f64 / 60000.0).max(0.5)
@@ -112,26 +138,45 @@ impl SnapshotBuilder {
             let bucket_ts = (e.ts as i64 / 60000) * 60000;
             let entry = buckets.entry(bucket_ts).or_insert(Bucket {
                 ts: bucket_ts,
-                requests: 0, ok: 0, fail: 0, rate_limited: 0,
-                prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
-                latency_ms_avg: 0, latency_ms_max: 0,
-                cost: 0.0, by_model: Vec::new(),
+                requests: 0,
+                ok: 0,
+                fail: 0,
+                rate_limited: 0,
+                prompt_tokens: 0,
+                completion_tokens: 0,
+                total_tokens: 0,
+                latency_ms_avg: 0,
+                latency_ms_max: 0,
+                cost: 0.0,
+                by_model: Vec::new(),
             });
 
             entry.requests += 1;
-            if e.ok { entry.ok += 1; } else { entry.fail += 1; }
-            if e.rate_limited { entry.rate_limited += 1; }
+            if e.ok {
+                entry.ok += 1;
+            } else {
+                entry.fail += 1;
+            }
+            if e.rate_limited {
+                entry.rate_limited += 1;
+            }
             entry.prompt_tokens += e.prompt_tokens;
             entry.completion_tokens += e.completion_tokens;
             entry.total_tokens += e.total_tokens;
-            if e.latency_ms > entry.latency_ms_max { entry.latency_ms_max = e.latency_ms; }
+            if e.latency_ms > entry.latency_ms_max {
+                entry.latency_ms_max = e.latency_ms;
+            }
             entry.cost += e.cost;
 
             let model_entry = entry.by_model.iter_mut().find(|m| m.model == e.model);
             match model_entry {
                 Some(m) => {
                     m.requests += 1;
-                    if e.ok { m.ok += 1; } else { m.fail += 1; }
+                    if e.ok {
+                        m.ok += 1;
+                    } else {
+                        m.fail += 1;
+                    }
                     m.total_tokens += e.total_tokens;
                 }
                 None => {
@@ -148,7 +193,8 @@ impl SnapshotBuilder {
 
         for entry in buckets.values_mut() {
             if entry.requests > 0 {
-                let latency_sum: u64 = events.iter()
+                let latency_sum: u64 = events
+                    .iter()
                     .filter(|e| (e.ts as i64 / 60000) * 60000 == entry.ts)
                     .map(|e| e.latency_ms)
                     .sum();
@@ -183,7 +229,7 @@ impl SnapshotBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::metrics::store::{MetricsStore, now_ms};
+    use crate::metrics::store::{now_ms, MetricsStore};
 
     fn dummy_event() -> Event {
         Event {
@@ -207,10 +253,18 @@ mod tests {
     #[test]
     fn empty_snapshot_is_valid() {
         let store = MetricsStore::new(100);
-        let ms = ModelStatus { primary: vec![], all: vec![] };
+        let ms = ModelStatus {
+            primary: vec![],
+            all: vec![],
+        };
         let usage = UsageSummary {
-            enabled: false, path: None, today: String::new(),
-            totals: None, by_day: vec![], by_model_today: vec![], by_model_24h: vec![],
+            enabled: false,
+            path: None,
+            today: String::new(),
+            totals: None,
+            by_day: vec![],
+            by_model_today: vec![],
+            by_model_24h: vec![],
         };
         let snap = SnapshotBuilder::build(&store, 300000, &ms, usage, &[], "round-robin");
         assert_eq!(snap.version, 1);
@@ -223,10 +277,18 @@ mod tests {
         for _ in 0..5 {
             store.record(dummy_event());
         }
-        let ms = ModelStatus { primary: vec![], all: vec![] };
+        let ms = ModelStatus {
+            primary: vec![],
+            all: vec![],
+        };
         let usage = UsageSummary {
-            enabled: false, path: None, today: String::new(),
-            totals: None, by_day: vec![], by_model_today: vec![], by_model_24h: vec![],
+            enabled: false,
+            path: None,
+            today: String::new(),
+            totals: None,
+            by_day: vec![],
+            by_model_today: vec![],
+            by_model_24h: vec![],
         };
         let snap = SnapshotBuilder::build(&store, 300000, &ms, usage, &[], "round-robin");
         assert_eq!(snap.recent.len(), 5);

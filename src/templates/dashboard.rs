@@ -1,5 +1,6 @@
 pub fn render(version: &str) -> String {
-    format!(r#"<!doctype html>
+    format!(
+        r#"<!doctype html>
 <html lang="ru" data-theme="dark">
 <head>
   <meta charset="utf-8">
@@ -321,5 +322,6 @@ pub fn render(version: &str) -> String {
     initCharts(); refresh(); setInterval(refresh, 5000);
   </script>
 </body>
-</html>"#)
+</html>"#
+    )
 }
