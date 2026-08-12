@@ -39,11 +39,11 @@ cargo build --release
 ### Запуск
 
 ```bash
-# По умолчанию: http://127.0.0.1:3000
+# По умолчанию: http://127.0.0.1:3001 (Rust прокси)
 ./opencode-proxy
 
-# Свой порт
-PORT=3001 ./opencode-proxy
+# Свой порт (если нужно)
+PORT=3002 ./opencode-proxy
 
 # Свой upstream
 UPSTREAM_URL=https://api.example.com/v1 ./opencode-proxy

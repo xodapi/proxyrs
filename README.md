@@ -39,11 +39,11 @@ cargo build --release
 ### Run
 
 ```bash
-# Default: http://127.0.0.1:3000
+# Default: http://127.0.0.1:3001 (Rust proxy)
 ./opencode-proxy
 
-# Custom port
-PORT=3001 ./opencode-proxy
+# Custom port (if needed)
+PORT=3002 ./opencode-proxy
 
 # Custom upstream API
 UPSTREAM_URL=https://api.example.com/v1 ./opencode-proxy
@@ -52,6 +52,8 @@ UPSTREAM_URL=https://api.example.com/v1 ./opencode-proxy
 RUST_LOG=debug ./opencode-proxy
 ```
 
+**Note**: By default runs on **3001** to avoid conflicts with Node.js OpenCode proxy (port 3000)
+
 ## Configuration
 
 All settings via environment variables (no config file needed):
@@ -59,7 +61,7 @@ All settings via environment variables (no config file needed):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `HOST` | `127.0.0.1` | Bind address |
-| `PORT` | `3000` | Server port |
+| `PORT` | `3001` | Server port (default: 3001 to avoid conflict with Node.js proxy on 3000) |
 | `MODELS` | `gpt-4,gpt-4-turbo,gpt-3.5-turbo,claude-3-opus,claude-3-sonnet` | Available models (comma-separated) |
 | `ROUTING` | `round-robin` | Load balancing: `round-robin` or `random` |
 | `UPSTREAM_URL` | `https://opencode.ai/zen/v1` | Upstream API endpoint |
@@ -74,28 +76,31 @@ All settings via environment variables (no config file needed):
 ### Public (no auth required)
 
 ```bash
-# Health check
-curl http://127.0.0.1:3000/health
+# Health check (Rust proxy on 3001)
+curl http://127.0.0.1:3001/health
 # → {"status":"ok"}
 
 # List models (OpenAI-compatible)
-curl http://127.0.0.1:3000/v1/models
+curl http://127.0.0.1:3001/v1/models
 # → {"object":"list","data":[{"id":"gpt-4",...}]}
 
 # Chat completions (OpenAI-compatible)
-curl -X POST http://127.0.0.1:3000/v1/chat/completions \
+curl -X POST http://127.0.0.1:3001/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-4","messages":[{"role":"user","content":"Hello"}]}'
+
+# Note: Node.js OpenCode proxy runs on 3000
+curl http://127.0.0.1:3000/health  # Node.js proxy
 ```
 
 ### Protected (`MANAGEMENT_TOKEN` required)
 
 ```bash
-# Dashboard UI
-curl -H "Authorization: Bearer YOUR_TOKEN" http://127.0.0.1:3000/dashboard
+# Dashboard UI (Rust proxy on 3001)
+curl -H "Authorization: Bearer YOUR_TOKEN" http://127.0.0.1:3001/dashboard
 
 # Metrics JSON
-curl -H "Authorization: Bearer YOUR_TOKEN" http://127.0.0.1:3000/metrics
+curl -H "Authorization: Bearer YOUR_TOKEN" http://127.0.0.1:3001/metrics
 # → {"version":1,"window":{"requests":42,"tokens":1250},"models":{...}}
 
 # Usage statistics
@@ -116,7 +121,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" http://127.0.0.1:3000/export/json
 ```python
 import openai
 
-openai.api_base = "http://127.0.0.1:3000/v1"
+openai.api_base = "http://127.0.0.1:3001/v1"  # Rust proxy on 3001
 openai.api_key = "sk-dummy"  # not used by proxy
 
 response = openai.ChatCompletion.create(
@@ -129,7 +134,7 @@ print(response.choices[0].message.content)
 ### JavaScript Client
 
 ```javascript
-const response = await fetch('http://127.0.0.1:3000/v1/chat/completions', {
+const response = await fetch('http://127.0.0.1:3001/v1/chat/completions', {  // Rust proxy on 3001
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -145,7 +150,7 @@ console.log(data.choices[0].message.content);
 ### Streaming
 
 ```bash
-curl -X POST http://127.0.0.1:3000/v1/chat/completions \
+curl -X POST http://127.0.0.1:3001/v1/chat/completions \  # Rust proxy on 3001
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-4","messages":[{"role":"user","content":"Write a poem"}],"stream":true}' \
   | grep "data:" | sed 's/data: //' | jq '.choices[0].delta.content'
