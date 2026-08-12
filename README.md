@@ -380,10 +380,18 @@ MIT License — see [LICENSE](LICENSE)
 
 AI-инженер, 20+ лет в системной разработке (ОАО РЖД). Работаю с 5–7 параллельными агентными сессиями в день, управляю production-кодом через контракты, ветвления и fail-closed гейты.
 
-- **Резюме & Portfolio**: [bogorad.syntog.ru/r](https://bogorad.syntog.ru/r) (публичное) · [bogorad.syntog.ru/webmasters](https://bogorad.syntog.ru/webmasters/) (адресное) · [bogorad.syntog.ru](https://bogorad.syntog.ru/) (основное)
-- **GitHub**: [github.com/xodapi](https://github.com/xodapi) (2,200+ контрибуций/год)
-- **Contact**: [Telegram @serg_borisovich](https://t.me/serg_borisovich) · +7 983 205-56-78
-- **Based in**: Санкт-Петербург (СПб) · готов к офису 5/2
+### Portfolio & Resume
+
+- 🌐 **Main Portfolio**: https://bogorad.syntog.ru/
+- 📄 **Public Resume**: https://bogorad.syntog.ru/r (AI-engineer profile)
+- 📋 **Address Response**: https://bogorad.syntog.ru/webmasters/ (for WebMasters)
+
+### Connect
+
+- **GitHub**: [github.com/xodapi](https://github.com/xodapi) (2,200+ контрибуций/год, 38 репозиториев)
+- **Telegram**: [@serg_borisovich](https://t.me/serg_borisovich)
+- **Phone**: +7 983 205-56-78
+- **Location**: Санкт-Петербург · готов к офису 5/2
 
 ## Acknowledgments
 
