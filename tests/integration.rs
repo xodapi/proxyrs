@@ -226,3 +226,63 @@ async fn limits_with_auth_returns_json() {
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert!(json.get("limits").is_some());
 }
+
+#[tokio::test]
+async fn chat_completions_request_format_valid() {
+    let mut app = server::build_router(test_config());
+    let request_body = serde_json::json!({
+        "model": "deepseek-v4-flash-free",
+        "messages": [
+            {"role": "system", "content": "You are helpful"},
+            {"role": "user", "content": "Hello"}
+        ],
+        "max_tokens": 50,
+        "temperature": 0.7
+    });
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/chat/completions")
+                .header("Content-Type", "application/json")
+                .body(Body::from(request_body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Should get 502+ (upstream error) not 400 (validation error)
+    // This means request passed validation and was forwarded
+    let status = response.status().as_u16();
+    assert!(
+        status >= 500 || status == 200,
+        "Expected 200 or 502+, got {}",
+        status
+    );
+}
+
+#[tokio::test]
+async fn chat_playground_page_loads() {
+    let mut app = server::build_router(test_config());
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/playground")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let html = String::from_utf8(body.to_vec()).unwrap();
+
+    // Should contain HTML
+    assert!(html.len() > 100, "Playground HTML too small");
+}
