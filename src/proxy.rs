@@ -94,15 +94,30 @@ pub async fn chat_completions_handler(
             Ok(upstream_response) => {
                 let upstream_status = upstream_response.status().as_u16();
                 let is_ok = upstream_status < 400;
+                let is_rate_limit = upstream_status == 429;
 
                 if !is_ok {
-                    state
-                        .provider_pool
-                        .record_result(&provider_name, false, upstream_status, 0)
-                        .await;
-                    last_err = Some(format!("{}: {}", provider_name, upstream_status));
-                    attempts += 1;
-                    continue;
+                    // 429 is rate limit - soft error, try next provider
+                    // Other errors are treated as provider failure
+                    if is_rate_limit {
+                        state
+                            .provider_pool
+                            .record_result(&provider_name, false, upstream_status, 0)
+                            .await;
+                        last_err = Some(format!("{}: {}", provider_name, upstream_status));
+                        attempts += 1;
+                        // Wait briefly before retry
+                        tokio::time::sleep(std::time::Duration::from_millis(100 * attempts as u64)).await;
+                        continue;
+                    } else {
+                        state
+                            .provider_pool
+                            .record_result(&provider_name, false, upstream_status, 0)
+                            .await;
+                        last_err = Some(format!("{}: {}", provider_name, upstream_status));
+                        attempts += 1;
+                        continue;
+                    }
                 }
 
                 state
