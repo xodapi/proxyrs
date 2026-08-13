@@ -1,36 +1,58 @@
 # opencode-proxy-rs
 
-[![CI](https://github.com/ArtemPotapov52/opencode-proxy/actions/workflows/ci.yml/badge.svg)](https://github.com/ArtemPotapov52/opencode-proxy/actions/workflows/ci.yml)
+[![CI](https://github.com/xodapi/proxyrs/actions/workflows/ci.yml/badge.svg)](https://github.com/xodapi/proxyrs/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/xodapi/proxyrs)](https://github.com/xodapi/proxyrs/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Rust 1.70+](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org)
+[![Rust 1.97+](https://img.shields.io/badge/rust-1.97+-orange.svg)](https://www.rust-lang.org)
 
-A high-performance OpenAI-compatible proxy for the OpenCode Zen API, written in Rust. Single 2.6 MB binary with zero external dependencies.
+A high-performance OpenAI-compatible proxy for multiple LLM providers, written in Rust. Single 2.7 MB binary with zero external dependencies.
 
 **Key Features:**
-- ⚡ 50x smaller than Node.js version (2.6 MB vs 50 MB)
+- ⚡ 50x smaller than Node.js alternatives (2.7 MB vs 50+ MB)
 - 🚀 Async/concurrent requests with Tokio
-- 📊 Built-in dashboard and metrics
-- 🔄 Streaming SSE passthrough
-- 🎯 Load balancing (round-robin, random)
-- 💾 Persistent usage analytics
+- 📊 Built-in dashboard and real-time metrics
+- 🔄 Streaming SSE passthrough (zero-copy)
+- 🎯 Load balancing (round-robin, weighted, failover)
+- 💾 Persistent usage analytics (embedded redb)
 - 🔐 Token-based access control
 - 🛡️ Security headers & CSP
-- ✅ 17+ unit tests, 100% passing
+- ✅ 62 comprehensive tests, 100% passing
+- 🏭 Production-ready (v1.7.0)
 
-## Quick Start
+## Why This Exists
+
+This proxy provides:
+1. **OpenAI-compatible API** for multiple LLM providers (OpenAI, Anthropic, Groq, OpenRouter, etc.)
+2. **Load balancing** with automatic failover
+3. **Rate limiting** and usage tracking
+4. **Unified interface** - one endpoint for all providers
+5. **Production-ready** - 62 comprehensive tests, zero clippy errors
+
+Perfect for:
+- 🤖 **AI Development Teams** - unified API for multiple models
+- 📊 **Usage Monitoring** - track costs and performance
+- 🚀 **Production Deployments** - reliable, fast, small footprint
+- 🔧 **Local Development** - test different models without changing code
+
+## Related Projects
+
+Part of **LLM Developer Toolkit**:
+- **[vimit](https://github.com/xodapi/vimit)** - VibeMode quota monitor (CLI/TUI/GUI/Android)
+- **opencode-proxy-rs** (this project) - API router & load balancer
+- **llm-dev-dashboard** (planned) - Web portal with chat playground
 
 ### Installation
 
 **Option 1: Download Binary (Windows)**
 ```powershell
 # From releases
-wget https://github.com/ArtemPotapov52/opencode-proxy/releases/download/v1.7.0/opencode-proxy.exe
+wget https://github.com/xodapi/proxyrs/releases/download/v1.7.0/opencode-proxy.exe
 .\opencode-proxy.exe
 ```
 
 **Option 2: Build from Source**
 ```bash
-git clone https://github.com/ArtemPotapov52/opencode-proxy.git opencode-proxy-rs
+git clone https://github.com/xodapi/proxyrs.git opencode-proxy-rs
 cd opencode-proxy-rs
 cargo build --release
 ./target/release/opencode-proxy
