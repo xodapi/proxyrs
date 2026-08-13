@@ -113,11 +113,7 @@ impl SnapshotBuilder {
             }
         }
 
-        total.latency_ms_avg = if total.requests > 0 {
-            latency_sum / total.requests
-        } else {
-            0
-        };
+        total.latency_ms_avg = latency_sum.checked_div(total.requests).unwrap_or(0);
 
         let duration_min = if last_ts > first_ts {
             ((last_ts - first_ts) as f64 / 60000.0).max(0.5)
@@ -135,7 +131,7 @@ impl SnapshotBuilder {
         let mut buckets: HashMap<i64, Bucket> = HashMap::new();
 
         for e in events {
-            let bucket_ts = (e.ts as i64 / 60000) * 60000;
+            let bucket_ts = (e.ts / 60000) * 60000;
             let entry = buckets.entry(bucket_ts).or_insert(Bucket {
                 ts: bucket_ts,
                 requests: 0,
@@ -195,10 +191,10 @@ impl SnapshotBuilder {
             if entry.requests > 0 {
                 let latency_sum: u64 = events
                     .iter()
-                    .filter(|e| (e.ts as i64 / 60000) * 60000 == entry.ts)
+                    .filter(|e| (e.ts / 60000) * 60000 == entry.ts)
                     .map(|e| e.latency_ms)
                     .sum();
-                entry.latency_ms_avg = latency_sum / entry.requests;
+                entry.latency_ms_avg = latency_sum.checked_div(entry.requests).unwrap_or(0);
             }
         }
 

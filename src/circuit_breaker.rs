@@ -88,11 +88,7 @@ impl Provider {
         match &self.circuit {
             CircuitState::Closed => true,
             CircuitState::Open { opened_at } => {
-                if opened_at.elapsed() >= self.reset_timeout {
-                    true
-                } else {
-                    false
-                }
+                opened_at.elapsed() >= self.reset_timeout
             }
             CircuitState::HalfOpen => true,
         }

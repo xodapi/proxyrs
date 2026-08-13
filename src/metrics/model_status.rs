@@ -58,7 +58,7 @@ impl ModelStatusBuilder {
         }
 
         let mut all: Vec<ModelInfo> = model_map.into_values().collect();
-        all.sort_by(|a, b| a.model.cmp(&b.model));
+        all.sort_by_key(|a| a.model.clone());
 
         let primary: Vec<ModelInfo> = primary_models
             .iter()

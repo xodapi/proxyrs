@@ -2,7 +2,6 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use opencode_proxy::config::Config;
 use opencode_proxy::server;
-use serde_json;
 use tower::util::ServiceExt;
 
 fn test_config() -> Config {
@@ -212,7 +211,7 @@ async fn providers_with_auth_returns_json() {
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert!(json.get("providers").is_some());
-    assert!(json["providers"].as_array().unwrap().len() > 0);
+    assert!(!json["providers"].as_array().unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -229,7 +228,7 @@ async fn limits_with_auth_returns_json() {
 
 #[tokio::test]
 async fn chat_completions_request_format_valid() {
-    let mut app = server::build_router(test_config());
+    let app = server::build_router(test_config());
     let request_body = serde_json::json!({
         "model": "deepseek-v4-flash-free",
         "messages": [
@@ -265,7 +264,7 @@ async fn chat_completions_request_format_valid() {
 
 #[tokio::test]
 async fn chat_playground_page_loads() {
-    let mut app = server::build_router(test_config());
+    let app = server::build_router(test_config());
     let response = app
         .clone()
         .oneshot(

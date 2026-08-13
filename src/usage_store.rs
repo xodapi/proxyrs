@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use chrono::Utc;
@@ -152,15 +152,11 @@ impl UsageStore {
         };
 
         let file_len = metadata.len();
-        let read_start = if file_len > DEFAULT_READ_LIMIT_BYTES {
-            file_len - DEFAULT_READ_LIMIT_BYTES
-        } else {
-            0
-        };
+        let read_start = file_len.saturating_sub(DEFAULT_READ_LIMIT_BYTES);
 
         let mut reader = BufReader::new(file);
         if read_start > 0 {
-            if let Err(_) = reader.seek(SeekFrom::Start(read_start)) {
+            if reader.seek(SeekFrom::Start(read_start)).is_err() {
                 return Vec::new();
             }
             let mut skip = String::new();
@@ -169,12 +165,14 @@ impl UsageStore {
 
         let mut events = Vec::new();
         for line in reader.lines() {
-            if let Ok(line) = line {
-                let trimmed = line.trim().to_string();
-                if !trimmed.is_empty() {
-                    if let Ok(event) = serde_json::from_str::<StoredEvent>(&trimmed) {
-                        events.push(event);
-                    }
+            let line = match line {
+                Ok(l) => l,
+                Err(_) => break, // Stop on read error
+            };
+            let trimmed = line.trim().to_string();
+            if !trimmed.is_empty() {
+                if let Ok(event) = serde_json::from_str::<StoredEvent>(&trimmed) {
+                    events.push(event);
                 }
             }
         }
@@ -204,7 +202,7 @@ fn summarize_usage(
     events: &[StoredEvent],
     retention_days: u32,
     enabled: bool,
-    path: &PathBuf,
+    path: &Path,
 ) -> UsageSummary {
     let now = Utc::now();
     let today_str = now.format("%Y-%m-%d").to_string();
@@ -224,7 +222,7 @@ fn summarize_usage(
         .into_iter()
         .map(|(day, events)| aggregate_day(&day, &events))
         .collect();
-    by_day.sort_by(|a, b| b.day.cmp(&a.day));
+    by_day.sort_by_key(|a| std::cmp::Reverse(a.day.clone()));
 
     let today_events: Vec<&StoredEvent> = recent
         .iter()
@@ -238,7 +236,7 @@ fn summarize_usage(
 
     let by_model_today = aggregate_by_model(&today_events);
 
-    let cutoff_24h = (now.timestamp_millis() - 86400 * 1000) as i64;
+    let cutoff_24h = now.timestamp_millis() - 86400 * 1000;
     let events_24h: Vec<&StoredEvent> = recent
         .iter()
         .filter(|e| e.ts >= cutoff_24h)
@@ -247,7 +245,7 @@ fn summarize_usage(
     let by_model_24h = aggregate_by_model(&events_24h);
 
     let totals: Option<UsageTotals> = {
-        let total_events: Vec<&StoredEvent> = recent.iter().cloned().collect();
+        let total_events: Vec<&StoredEvent> = recent.to_vec();
         if total_events.is_empty() {
             None
         } else {
@@ -306,8 +304,8 @@ fn aggregate_day(day: &str, events: &[&StoredEvent]) -> DayUsage {
         latency_sum += e.latency_ms;
         usage.cost += e.cost;
     }
-    if usage.requests > 0 {
-        usage.latency_ms_avg = latency_sum / usage.requests;
+    if let Some(avg) = latency_sum.checked_div(usage.requests) {
+        usage.latency_ms_avg = avg;
     }
     usage
 }
@@ -352,13 +350,13 @@ fn aggregate_by_model(events: &[&StoredEvent]) -> Vec<ModelUsage> {
                 latency_sum += e.latency_ms;
                 mu.cost += e.cost;
             }
-            if mu.requests > 0 {
-                mu.latency_ms_avg = latency_sum / mu.requests;
+            if let Some(avg) = latency_sum.checked_div(mu.requests) {
+                mu.latency_ms_avg = avg;
             }
             mu
         })
         .collect();
 
-    result.sort_by(|a, b| b.requests.cmp(&a.requests));
+    result.sort_by_key(|b| std::cmp::Reverse(b.requests));
     result
 }

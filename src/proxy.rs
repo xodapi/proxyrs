@@ -274,18 +274,20 @@ pub async fn playground_test_handler(
             };
             record_event(
                 &state,
-                model,
-                false,
-                502,
-                latency_ms,
-                0,
-                0,
-                0,
-                Some(error_type.to_string()),
-                false,
-                None,
-                false,
-                false,
+                EventParams {
+                    model,
+                    ok: false,
+                    status: 502,
+                    latency_ms,
+                    prompt_tokens: 0,
+                    completion_tokens: 0,
+                    total_tokens: 0,
+                    error_type: Some(error_type.to_string()),
+                    rate_limited: false,
+                    finish_reason: None,
+                    usage_reported: false,
+                    usage_estimated: false,
+                },
             );
             return err_response(StatusCode::BAD_GATEWAY, &err_msg);
         }
@@ -377,18 +379,20 @@ async fn handle_non_streaming(
             let latency_ms = started_at.elapsed().as_millis() as u64;
             record_event(
                 &state,
-                &selected_model,
-                false,
-                502,
-                latency_ms,
-                0,
-                0,
-                0,
-                Some("upstream_read_error".to_string()),
-                false,
-                None,
-                false,
-                false,
+                EventParams {
+                    model: &selected_model,
+                    ok: false,
+                    status: 502,
+                    latency_ms,
+                    prompt_tokens: 0,
+                    completion_tokens: 0,
+                    total_tokens: 0,
+                    error_type: Some("upstream_read_error".to_string()),
+                    rate_limited: false,
+                    finish_reason: None,
+                    usage_reported: false,
+                    usage_estimated: false,
+                },
             );
             return err_response(StatusCode::BAD_GATEWAY, &e.to_string());
         }
@@ -430,18 +434,20 @@ async fn handle_non_streaming(
 
     record_event(
         &state,
-        &selected_model,
-        is_ok,
-        upstream_status,
-        latency_ms,
-        prompt,
-        completion,
-        total,
-        error_type,
-        is_rate_limited,
-        Some(&finish_reason),
-        usage_reported,
-        usage_estimated,
+        EventParams {
+            model: &selected_model,
+            ok: is_ok,
+            status: upstream_status,
+            latency_ms,
+            prompt_tokens: prompt,
+            completion_tokens: completion,
+            total_tokens: total,
+            error_type,
+            rate_limited: is_rate_limited,
+            finish_reason: Some(&finish_reason),
+            usage_reported,
+            usage_estimated,
+        },
     );
 
     let status = StatusCode::from_u16(upstream_status).unwrap_or(StatusCode::OK);
@@ -492,7 +498,7 @@ async fn handle_streaming(
                 }
                 Err(e) => {
                     let _ = tx
-                        .send(Err(std::io::Error::new(std::io::ErrorKind::Other, e)))
+                        .send(Err(std::io::Error::other(e)))
                         .await;
                     break;
                 }
@@ -515,18 +521,20 @@ async fn handle_streaming(
 
         record_event(
             &state_clone,
-            &model_clone,
-            true,
-            upstream_status,
-            latency_ms,
-            prompt,
-            completion,
-            total,
-            None,
-            false,
-            Some("stop"),
-            usage_reported,
-            usage_estimated,
+            EventParams {
+                model: &model_clone,
+                ok: true,
+                status: upstream_status,
+                latency_ms,
+                prompt_tokens: prompt,
+                completion_tokens: completion,
+                total_tokens: total,
+                error_type: None,
+                rate_limited: false,
+                finish_reason: Some("stop"),
+                usage_reported,
+                usage_estimated,
+            },
         );
     });
 
@@ -608,9 +616,8 @@ fn estimate_tokens(text: &str) -> (u64, u64) {
     (len / 4, len / 8)
 }
 
-fn record_event(
-    state: &AppState,
-    model: &str,
+struct EventParams<'a> {
+    model: &'a str,
     ok: bool,
     status: u16,
     latency_ms: u64,
@@ -619,25 +626,27 @@ fn record_event(
     total_tokens: u64,
     error_type: Option<String>,
     rate_limited: bool,
-    finish_reason: Option<&str>,
+    finish_reason: Option<&'a str>,
     usage_reported: bool,
     usage_estimated: bool,
-) {
+}
+
+fn record_event(state: &AppState, params: EventParams) {
     let event = Event {
         ts: now_ms() as i64,
-        model: model.to_string(),
-        ok,
-        status,
-        latency_ms,
-        prompt_tokens,
-        completion_tokens,
-        total_tokens,
-        error_type,
-        rate_limited,
-        finish_reason: finish_reason.map(|s| s.to_string()),
+        model: params.model.to_string(),
+        ok: params.ok,
+        status: params.status,
+        latency_ms: params.latency_ms,
+        prompt_tokens: params.prompt_tokens,
+        completion_tokens: params.completion_tokens,
+        total_tokens: params.total_tokens,
+        error_type: params.error_type,
+        rate_limited: params.rate_limited,
+        finish_reason: params.finish_reason.map(|s| s.to_string()),
         cost: 0.0,
-        usage_reported,
-        usage_estimated,
+        usage_reported: params.usage_reported,
+        usage_estimated: params.usage_estimated,
     };
 
     state.metrics.lock().unwrap().record(event.clone());

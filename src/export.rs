@@ -96,13 +96,13 @@ fn collect_records(store: &UsageStore) -> Vec<ExportRecord> {
                 latency_sum += e.latency_ms;
                 rec.cost += e.cost;
             }
-            if rec.requests > 0 {
-                rec.latency_ms_avg = latency_sum / rec.requests;
+            if let Some(avg) = latency_sum.checked_div(rec.requests) {
+                rec.latency_ms_avg = avg;
             }
             rec
         })
         .collect();
 
-    records.sort_by(|a, b| b.day.cmp(&a.day).then(a.model.cmp(&b.model)));
+    records.sort_by_key(|r| (std::cmp::Reverse(r.day.clone()), r.model.clone()));
     records
 }
